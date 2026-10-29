@@ -108,7 +108,7 @@ DEPLOYER_PRIVATE_KEY=0x... node scripts/deploy.mjs
 CONTRACT=0x... DEPLOYER_PRIVATE_KEY=0x... CUSTOMER_PRIVATE_KEY=0x... node scripts/demo.mjs   # optional: seeds the GitHub demo SLA
 ```
 
-Frontend on Vercel: import this repo. `vercel.json` already builds `frontend/` and serves `frontend/dist`, so no settings are needed.
+Frontend on Vercel: import this repo, set **Root Directory** to `frontend` and keep the Vite preset. No other settings are needed.
 
 ## Limits
 
