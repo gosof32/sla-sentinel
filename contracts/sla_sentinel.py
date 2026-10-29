@@ -25,6 +25,10 @@ VERDICT_REASONS = {
     "NOT_COVERED": ("OTHER_COMPONENT", "NO_CUSTOMER_IMPACT", "INSUFFICIENT_EVIDENCE"),
 }
 
+REASON_VERDICT = {r: v for v, rs in VERDICT_REASONS.items() for r in rs}
+COUNTING_REASONS = ("SERVICE_DOWN", "DEGRADED")
+DEGRADED_STATUSES = ("partial_outage", "degraded_performance")
+
 REASON_TEXT = {
     "SERVICE_DOWN": "Covered service was unavailable to customers.",
     "DEGRADED": "Covered service was degraded (errors, latency or partial failure).",
@@ -181,11 +185,61 @@ def _fetch_incident_facts(host: str, incident_id: str) -> dict:
             {"status": str(u.get("status") or ""), "at": str(u.get("created_at") or ""), "body": str(u.get("body") or "")[:600]}
             for u in updates[:12]
         ],
+        "timeline": [
+            [
+                str(u.get("created_at") or ""),
+                sorted(
+                    [str(a.get("name") or ""), str(a.get("new_status") or "")]
+                    for a in u["affected_components"]
+                    if isinstance(a, dict)
+                ),
+            ]
+            for u in updates[:40]
+            if isinstance(u.get("affected_components"), list) and u["affected_components"]
+        ],
     }
 
 
 def _stable_facts(facts: dict) -> dict:
-    return {k: facts[k] for k in ("id", "impact", "started_at", "resolved_at", "scheduled", "components")}
+    return {k: facts.get(k) for k in ("id", "impact", "started_at", "resolved_at", "scheduled", "components", "timeline")}
+
+
+def _timeline_minutes(timeline: list, covered: list, started: datetime, end: datetime, partial_pct: int):
+    """Weight each interval between status updates by the worst status of any covered component.
+
+    Returns (counted_minutes, worst_status) or None when the status page published no
+    component-level status for a covered component.
+    """
+    points = []
+    for at, statuses in timeline:
+        state = {name: st for name, st in statuses if name in covered}
+        points.append((_parse_ts(at), state))
+    if not any(st in DEGRADED_STATUSES or st == "major_outage" for _, state in points for st in state.values()):
+        return None
+    points.sort(key=lambda p: p[0])
+    worst_seen = "degraded_performance"
+    weighted = 0
+    for i, (at, state) in enumerate(points):
+        seg_start = started if i == 0 else max(at, started)
+        seg_end = min(points[i + 1][0], end) if i + 1 < len(points) else end
+        if seg_end <= seg_start:
+            continue
+        statuses = set(state.values())
+        if "major_outage" in statuses:
+            factor, worst_seen = 100, "major_outage"
+        elif statuses & set(DEGRADED_STATUSES):
+            factor = partial_pct
+        else:
+            factor = 0
+        weighted += int((seg_end - seg_start).total_seconds()) * factor
+    return -(-weighted // 6000), worst_seen
+
+
+def _verdict_class(reason: str, facts: dict, covered: list) -> str:
+    has_timeline = any(name in covered for _, sts in facts.get("timeline") or [] for name, _ in sts)
+    if reason in COUNTING_REASONS and has_timeline:
+        return "COUNTS"
+    return reason
 
 
 def _classify(sla_name: str, covered: list, exclusions: str, facts: dict, overlap: list) -> dict:
@@ -209,18 +263,18 @@ Updates:
 {updates_text}
 </incident>
 
-Pick exactly one verdict and one matching reason:
-- FULL_OUTAGE / SERVICE_DOWN: a covered component was unavailable or failing for most customers.
-- PARTIAL_OUTAGE / DEGRADED: a covered component had elevated errors, latency, or failed for a subset of customers or features.
-- EXCLUDED / MAINTENANCE: scheduled or announced maintenance.
-- EXCLUDED / THIRD_PARTY: caused by a third party that the SLA exclusions name.
-- EXCLUDED / CUSTOMER_CAUSED: caused by customer actions.
-- NOT_COVERED / OTHER_COMPONENT: only components outside the covered list were affected.
-- NOT_COVERED / NO_CUSTOMER_IMPACT: updates say customers were not affected.
-- NOT_COVERED / INSUFFICIENT_EVIDENCE: the updates do not establish impact on a covered component.
-Use an exclusion only if the SLA exclusions text covers it.
+Pick exactly one reason code:
+- SERVICE_DOWN: a covered component was unavailable or failing for most customers.
+- DEGRADED: a covered component had elevated errors, latency, or failed for a subset of customers or features.
+- MAINTENANCE: scheduled or announced maintenance.
+- THIRD_PARTY: caused by a third party that the SLA exclusions name.
+- CUSTOMER_CAUSED: caused by customer actions.
+- OTHER_COMPONENT: only components outside the covered list were affected.
+- NO_CUSTOMER_IMPACT: updates say customers were not affected.
+- INSUFFICIENT_EVIDENCE: the updates do not establish impact on a covered component.
+Use THIRD_PARTY or CUSTOMER_CAUSED only if the SLA exclusions text covers it.
 
-Respond with JSON only: {{"verdict": "...", "reason": "..."}}"""
+Respond with JSON only: {{"reason": "<one code from the list>"}}"""
     raw = gl.nondet.exec_prompt(prompt, response_format="json")
     if isinstance(raw, str):
         try:
@@ -229,11 +283,14 @@ Respond with JSON only: {{"verdict": "...", "reason": "..."}}"""
             raise gl.vm.UserError("[LLM_ERROR] non-JSON classification")
     if not isinstance(raw, dict):
         raise gl.vm.UserError("[LLM_ERROR] classification is not an object")
-    verdict = str(raw.get("verdict", "")).strip().upper()
-    reason = str(raw.get("reason", "")).strip().upper()
-    if verdict not in VERDICT_REASONS or reason not in VERDICT_REASONS[verdict]:
-        raise gl.vm.UserError("[LLM_ERROR] invalid verdict/reason pair")
-    return {"verdict": verdict, "reason": reason}
+    reason = str(raw.get("reason", "")).strip().upper().replace(" ", "_")
+    if reason not in REASON_VERDICT:
+        verdict = str(raw.get("verdict", "")).strip().upper().replace(" ", "_")
+        options = VERDICT_REASONS.get(verdict, ())
+        if len(options) != 1:
+            raise gl.vm.UserError("[LLM_ERROR] invalid reason code")
+        reason = options[0]
+    return {"verdict": REASON_VERDICT[reason], "reason": reason}
 
 
 class SLASentinel(gl.Contract):
@@ -380,7 +437,11 @@ class SLASentinel(gl.Contract):
             mine = leader_fn()
             if _stable_facts(mine["facts"]) != _stable_facts(theirs["facts"]):
                 return False
-            return mine["verdict"] == theirs["verdict"] and mine["reason"] == theirs["reason"]
+            # Full vs. degraded is measured from component statuses, so validators only need
+            # to agree on whether the incident counts and, if not, why.
+            return _verdict_class(mine["reason"], mine["facts"], covered) == _verdict_class(
+                theirs.get("reason", ""), theirs["facts"], covered
+            )
 
         res = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
         facts = res["facts"]
@@ -409,7 +470,15 @@ class SLASentinel(gl.Contract):
 
         window_end = min(resolved, m_end)
         duration = max(1, -(-int((window_end - started).total_seconds()) // 60))
-        if verdict == "FULL_OUTAGE":
+        measured = None
+        if reason in COUNTING_REASONS:
+            measured = _timeline_minutes(
+                facts.get("timeline") or [], covered, started, window_end, int(sla.partial_weight_pct)
+            )
+        if measured is not None:
+            counted = min(measured[0], duration)
+            verdict, reason = ("FULL_OUTAGE", "SERVICE_DOWN") if measured[1] == "major_outage" else ("PARTIAL_OUTAGE", "DEGRADED")
+        elif verdict == "FULL_OUTAGE":
             counted = duration
         elif verdict == "PARTIAL_OUTAGE":
             counted = duration * int(sla.partial_weight_pct) // 100

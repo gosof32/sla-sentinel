@@ -2,7 +2,7 @@ import { createAccount, createClient, generatePrivateKey } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 
 export const CONTRACT_ADDRESS = (import.meta.env.VITE_CONTRACT_ADDRESS ||
-  "0xF0C1E354DB2E7595724F8D0dabe345bB9F7A18B4") as `0x${string}`;
+  "0xa87340B3519D73428c21c8eA1Fb9D0Cd752f668e") as `0x${string}`;
 export const RPC_URL = studionet.rpcUrls.default.http[0];
 export const EXPLORER = "https://explorer-studio.genlayer.com";
 export const GEN = 10n ** 18n;

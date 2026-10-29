@@ -14,5 +14,6 @@ const hash = await client.deployContract({ code, args: [] });
 console.log("tx", hash);
 const tx = await client.waitForTransactionReceipt({ hash, status: "ACCEPTED", interval: 3000, retries: 100 });
 const address = tx.txDataDecoded?.contractAddress || tx.data?.contract_address || tx.recipient;
-console.log("status", tx.statusName, "result", tx.txExecutionResultName);
+const lr = tx.consensus_data?.leader_receipt?.[0];
+console.log("status", tx.statusName ?? tx.status, "consensus", tx.result_name, "execution", lr?.execution_result);
 console.log("contract", address);

@@ -22,7 +22,7 @@ async function send(account, functionName, args, value = 0n) {
   const hash = await client.writeContract({ address, functionName, args, value });
   const tx = await client.waitForTransactionReceipt({ hash, status: "ACCEPTED", interval: 4000, retries: 150 });
   const lr = tx.consensus_data?.leader_receipt?.[0];
-  console.log(functionName, args.join(" "), "->", tx.statusName, tx.result_name, lr?.execution_result, JSON.stringify(lr?.result)?.slice(0, 200), hash);
+  console.log(functionName, args.join(" "), "->", tx.statusName ?? tx.status, tx.result_name, lr?.execution_result, JSON.stringify(lr?.result)?.slice(0, 200), hash);
   return tx;
 }
 
