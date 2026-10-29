@@ -14,7 +14,7 @@ SLA Sentinel moves that decision on-chain:
 
 The vendor's own published data is the evidence, and the vendor can't overrule the verdict.
 
-- Live app: _Vercel URL_ (see [Deploy](#deploy))
+- Live app: https://sla-sentinel-eight.vercel.app
 - Contract (Studionet, chain 61999): [`0xa87340B3519D73428c21c8eA1Fb9D0Cd752f668e`](https://explorer-studio.genlayer.com/address/0xa87340B3519D73428c21c8eA1Fb9D0Cd752f668e)
 
 ![SLA Sentinel app](docs/screenshot.png)
