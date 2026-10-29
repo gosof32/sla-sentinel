@@ -59,13 +59,18 @@ export function useTransactions(onSettled: () => void) {
 
   const poll = useCallback(
     async (id: string, hash: string) => {
+      let last = "";
+      const settle = (phase: string) => {
+        if (phase !== last) settledRef.current();
+        last = phase;
+      };
       for (let i = 0; i < 400; i++) {
         try {
           const tx = await reader.getTransaction({ hash: hash as any });
           const { status, execution, result, errorText } = receiptOutcome(tx);
           if (FAILED_STATUSES.includes(status)) {
             patch(id, { phase: "failed", status, execution, error: `Consensus ended as ${status}` });
-            settledRef.current();
+            settle("failed");
             return;
           }
           if (status === "ACCEPTED" || status === "FINALIZED") {
@@ -74,7 +79,7 @@ export function useTransactions(onSettled: () => void) {
             } else {
               patch(id, { phase: status === "FINALIZED" ? "finalized" : "accepted", status, execution, result });
             }
-            settledRef.current();
+            settle(status);
             if (status === "FINALIZED" || (execution && execution !== "SUCCESS")) return;
           } else {
             patch(id, { phase: "pending", status });
@@ -82,7 +87,7 @@ export function useTransactions(onSettled: () => void) {
         } catch {
           // transient RPC errors: keep polling the same hash, never resubmit
         }
-        await new Promise((r) => setTimeout(r, 4000));
+        await new Promise((r) => setTimeout(r, 5000));
       }
     },
     [patch],

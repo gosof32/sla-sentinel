@@ -3,7 +3,9 @@ import { studionet } from "genlayer-js/chains";
 
 export const CONTRACT_ADDRESS = (import.meta.env.VITE_CONTRACT_ADDRESS ||
   "0xa87340B3519D73428c21c8eA1Fb9D0Cd752f668e") as `0x${string}`;
-export const RPC_URL = studionet.rpcUrls.default.http[0];
+export const PUBLIC_RPC_URL = studionet.rpcUrls.default.http[0];
+// Browsers call the public RPC directly so its per-IP rate limit applies per user.
+export const RPC_URL: string = import.meta.env.VITE_RPC_URL || PUBLIC_RPC_URL;
 export const EXPLORER = "https://explorer-studio.genlayer.com";
 export const GEN = 10n ** 18n;
 
@@ -42,17 +44,17 @@ export async function connectInjected(): Promise<Wallet> {
   } catch {
     await provider.request({
       method: "wallet_addEthereumChain",
-      params: [{ chainId, chainName: "GenLayer Studionet", nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 }, rpcUrls: [RPC_URL] }],
+      params: [{ chainId, chainName: "GenLayer Studionet", nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 }, rpcUrls: [PUBLIC_RPC_URL] }],
     });
   }
   return { kind: "injected", address };
 }
 
-export const reader = createClient({ chain: studionet });
+export const reader = createClient({ chain: studionet, endpoint: RPC_URL });
 
 export function writerFor(wallet: Wallet) {
-  if (wallet.kind === "burner") return createClient({ chain: studionet, account: wallet.account });
-  return createClient({ chain: studionet, account: wallet.address, provider: eth() as any });
+  if (wallet.kind === "burner") return createClient({ chain: studionet, endpoint: RPC_URL, account: wallet.account });
+  return createClient({ chain: studionet, endpoint: RPC_URL, account: wallet.address, provider: eth() as any });
 }
 
 export async function read<T>(functionName: string, args: unknown[] = []): Promise<T> {

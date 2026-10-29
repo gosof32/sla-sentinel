@@ -17,6 +17,25 @@ The vendor's own published data is the evidence, and the vendor can't overrule t
 - Live app: _Vercel URL_ (see [Deploy](#deploy))
 - Contract (Studionet, chain 61999): [`0xa87340B3519D73428c21c8eA1Fb9D0Cd752f668e`](https://explorer-studio.genlayer.com/address/0xa87340B3519D73428c21c8eA1Fb9D0Cd752f668e)
 
+![SLA Sentinel app](docs/screenshot.png)
+
+## Live demo on Studionet
+
+SLA #1 on the live contract is **GitHub Core Developer Platform** on `www.githubstatus.com`. It covers Git Operations, API Requests, Pull Requests, Actions and Webhooks. Copilot's third-party model outages are excluded. Tiers: below 99.90 % uptime → 10 %, below 99.50 % → 25 %, below 99.00 % → 50 %. Degraded time counts 50 %. Pool: 60 GEN. Two customers are enrolled (40 and 20 GEN/month).
+
+Four real September 2026 GitHub incidents, each adjudicated by validators reading githubstatus.com live:
+
+| Incident | Vendor impact | Verdict | Counted |
+|---|---|---|---|
+| [`0rn90wk115q9`](https://www.githubstatus.com/incidents/0rn90wk115q9) Incident with several GitHub Services | critical | `FULL_OUTAGE / SERVICE_DOWN` | 81 min |
+| [`f6yrxnz5f7bs`](https://www.githubstatus.com/incidents/f6yrxnz5f7bs) Incident with Pull Requests | minor | `PARTIAL_OUTAGE / DEGRADED` | 7 min |
+| [`nlxnbqnkdzdl`](https://www.githubstatus.com/incidents/nlxnbqnkdzdl) Degradation with Gemini 3.8 Flash (Copilot AI Model Providers) | major | `NOT_COVERED / OTHER_COMPONENT` | 0 min |
+| [`jk2dy5h9yp3m`](https://www.githubstatus.com/incidents/jk2dy5h9yp3m) Delays in commit processing | minor | `PARTIAL_OUTAGE / DEGRADED` | 31 min |
+
+`close_month(1, "2026-09")` → 119 counted minutes → **99.72 % uptime** → 10 % credit → 4 GEN and 2 GEN credited. The pool is now 54 GEN, with 6 GEN allocated. The first customer then called `withdraw_credit` and received 4 GEN ([tx](https://explorer-studio.genlayer.com/tx/0xe17cc81e571c6ee9e71f2d0822874bc140efe749d9bffb25f3cf6f4e39f99fe2)).
+
+Every transaction above reached `MAJORITY_AGREE` with leader execution `SUCCESS` and is `FINALIZED`.
+
 ## How a verdict is reached
 
 `file_incident(sla_id, incident_id)` runs a leader/validator round (`gl.vm.run_nondet_unsafe`):
@@ -66,7 +85,7 @@ npm run dev        # http://localhost:5173
 npm run build
 ```
 
-`VITE_CONTRACT_ADDRESS` overrides the contract address (see `frontend/.env.example`).
+`VITE_CONTRACT_ADDRESS` overrides the contract address (see `frontend/.env.example`). `VITE_RPC_URL` overrides the JSON-RPC endpoint (default `https://studio.genlayer.com/api`, called directly from the browser so the public per-IP rate limit applies per user).
 
 ## Tests
 
