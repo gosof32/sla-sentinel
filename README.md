@@ -32,7 +32,7 @@ Four real September 2026 GitHub incidents, each adjudicated by validators readin
 | [`nlxnbqnkdzdl`](https://www.githubstatus.com/incidents/nlxnbqnkdzdl) Degradation with Gemini 3.8 Flash (Copilot AI Model Providers) | major | `NOT_COVERED / OTHER_COMPONENT` | 0 min |
 | [`jk2dy5h9yp3m`](https://www.githubstatus.com/incidents/jk2dy5h9yp3m) Delays in commit processing | minor | `PARTIAL_OUTAGE / DEGRADED` | 31 min |
 
-`close_month(1, "2026-09")` → 119 counted minutes → **99.72 % uptime** → 10 % credit → 4 GEN and 2 GEN credited. The pool is now 54 GEN, with 6 GEN allocated. The first customer then called `withdraw_credit` and received 4 GEN ([tx](https://explorer-studio.genlayer.com/tx/0xe17cc81e571c6ee9e71f2d0822874bc140efe749d9bffb25f3cf6f4e39f99fe2)).
+`close_month(1, "2026-09")` → 119 counted minutes → **99.72 % uptime** → 10 % credit → 4 GEN and 2 GEN credited. Right after settlement the pool was 54 GEN, with 6 GEN allocated. The first customer then called `withdraw_credit` and received 4 GEN ([tx](https://explorer-studio.genlayer.com/tx/0xe17cc81e571c6ee9e71f2d0822874bc140efe749d9bffb25f3cf6f4e39f99fe2)).
 
 Every transaction above reached `MAJORITY_AGREE` with leader execution `SUCCESS` and is `FINALIZED`.
 
